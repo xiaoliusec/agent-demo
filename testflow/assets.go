@@ -1,0 +1,8 @@
+package testflow
+
+import (
+	"embed"
+)
+
+//go:embed frontend/dist
+var Assets embed.FS
