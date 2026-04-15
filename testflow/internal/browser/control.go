@@ -112,6 +112,9 @@ func (b *BrowserControl) GetDOM(ctx context.Context) ([]*core.Element, error) {
 			if v, ok := m["placeholder"]; ok {
 				el.Placeholder = v.Str()
 			}
+			if v, ok := m["xpath"]; ok {
+				el.XPath = v.Str()
+			}
 			elements = append(elements, el)
 		}
 	}

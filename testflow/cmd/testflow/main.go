@@ -8,6 +8,7 @@ import (
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
+	wailsruntime "github.com/wailsapp/wails/v2/pkg/runtime"
 
 	"testflow"
 	"testflow/internal/browser"
@@ -75,9 +76,14 @@ func (a *App) StartTest(goal string) error {
 	engine := agentruntime.NewEngine(a.registry, a.guard, a.model, a.store)
 
 	go func() {
-		_ = engine.Run(context.Background(), goal, func(event string, data interface{}) {
+		err := engine.Run(context.Background(), goal, func(event string, data interface{}) {
+			a.emitEvent(event, data)
 			log.Printf("Event: %s, Data: %v", event, data)
 		})
+		if err != nil {
+			a.emitEvent("test_error", err.Error())
+			log.Printf("Test run error: %v", err)
+		}
 	}()
 
 	return nil
@@ -89,6 +95,8 @@ func (a *App) StopTest() error {
 		return fmt.Errorf("no test running")
 	}
 	a.store.SetStatus(&core.TestStatus{State: "stopped"})
+	a.emitEvent("status_update", a.store.GetStatus())
+	a.emitEvent("test_stopped", "stopped by user")
 	return nil
 }
 
@@ -113,8 +121,26 @@ func (a *App) GetLastScreenshot() []byte {
 }
 
 func (a *App) RegisterTools() {
-	browserTool := tools.NewBrowserTool(a.browser)
-	a.registry.Register(browserTool)
+	for _, name := range []string{
+		"browser.navigate",
+		"browser.screenshot",
+		"browser.get_dom",
+		"browser.click",
+		"browser.input",
+		"browser.select",
+		"browser.scroll",
+		"browser.hover",
+		"browser.wait",
+	} {
+		a.registry.Register(tools.NewNamedBrowserTool(name, a.browser))
+	}
+}
+
+func (a *App) emitEvent(event string, data interface{}) {
+	if a.ctx == nil {
+		return
+	}
+	wailsruntime.EventsEmit(a.ctx, event, data)
 }
 
 func (a *App) OnStartup(ctx context.Context) {

@@ -2,6 +2,8 @@ package tools
 
 import (
 	"context"
+	"encoding/base64"
+	"strconv"
 
 	"testflow/internal/browser"
 	"testflow/internal/core"
@@ -9,13 +11,21 @@ import (
 
 type BrowserTool struct {
 	browser *browser.BrowserControl
+	name    string
 }
 
 func NewBrowserTool(b *browser.BrowserControl) *BrowserTool {
-	return &BrowserTool{browser: b}
+	return &BrowserTool{browser: b, name: "browser.control"}
+}
+
+func NewNamedBrowserTool(name string, b *browser.BrowserControl) *BrowserTool {
+	return &BrowserTool{browser: b, name: name}
 }
 
 func (t *BrowserTool) Name() string {
+	if t.name != "" {
+		return t.name
+	}
 	return "browser.control"
 }
 
@@ -33,14 +43,20 @@ func (t *BrowserTool) Run(ctx context.Context, action core.Action) (core.ToolRes
 		if err != nil {
 			return core.ToolResult{OK: false, Error: err.Error()}, err
 		}
-		return core.ToolResult{OK: true, Output: "Screenshot taken", Artifacts: map[string]string{"screenshot": "data:image/png;base64," + string(img)}}, nil
+		return core.ToolResult{
+			OK:     true,
+			Output: "Screenshot taken",
+			Artifacts: map[string]string{
+				"screenshot": "data:image/png;base64," + base64.StdEncoding.EncodeToString(img),
+			},
+		}, nil
 
 	case "browser.get_dom":
-		_, err := t.browser.GetDOM(ctx)
+		elements, err := t.browser.GetDOM(ctx)
 		if err != nil {
 			return core.ToolResult{OK: false, Error: err.Error()}, err
 		}
-		return core.ToolResult{OK: true, Output: "DOM extracted"}, nil
+		return core.ToolResult{OK: true, Output: "DOM extracted: " + strconv.Itoa(len(elements)) + " elements"}, nil
 
 	case "browser.click":
 		selector := action.Args["selector"]
@@ -68,8 +84,10 @@ func (t *BrowserTool) Run(ctx context.Context, action core.Action) (core.ToolRes
 	case "browser.scroll":
 		selector := action.Args["selector"]
 		delta := 100
-		if _, ok := action.Args["delta"]; ok {
-			delta = 100
+		if raw := action.Args["delta"]; raw != "" {
+			if parsed, err := strconv.Atoi(raw); err == nil {
+				delta = parsed
+			}
 		}
 		if err := t.browser.Scroll(ctx, selector, delta); err != nil {
 			return core.ToolResult{OK: false, Error: err.Error()}, err
@@ -85,8 +103,10 @@ func (t *BrowserTool) Run(ctx context.Context, action core.Action) (core.ToolRes
 
 	case "browser.wait":
 		timeout := 5
-		if _, ok := action.Args["timeout"]; ok {
-			timeout = 5
+		if raw := action.Args["timeout"]; raw != "" {
+			if parsed, err := strconv.Atoi(raw); err == nil {
+				timeout = parsed
+			}
 		}
 		if err := t.browser.Wait(ctx, timeout); err != nil {
 			return core.ToolResult{OK: false, Error: err.Error()}, err

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { ElCard, ElScrollbar } from 'element-plus'
+import { ElScrollbar } from 'element-plus'
 
 const screenshotUrl = ref('')
 const operationLogs = ref<{time: string, action: string, result: string}[]>([])
@@ -9,17 +9,16 @@ onMounted(() => {
   // @ts-ignore
   if (window.runtime) {
     // @ts-ignore
-    window.runtime.Events.On('screenshot_update', (data: number[]) => {
-      const blob = new Blob([new Uint8Array(data)], { type: 'image/png' })
-      screenshotUrl.value = URL.createObjectURL(blob)
+    window.runtime.Events.On('screenshot_update', (data: string) => {
+      screenshotUrl.value = data
     })
     
     // @ts-ignore
     window.runtime.Events.On('step_complete', (data: any) => {
       operationLogs.value.push({
         time: new Date().toLocaleTimeString(),
-        action: data.result?.Output || '完成',
-        result: data.result?.OK ? '成功' : '失败'
+        action: data.result?.output || '完成',
+        result: data.result?.ok ? '成功' : '失败'
       })
     })
   }

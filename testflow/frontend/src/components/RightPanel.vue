@@ -16,29 +16,19 @@ const moduleStats = ref<{name: string, total: number, passed: number, failed: nu
 
 const activeTab = ref('list')
 
-const statusMap: Record<string, string> = {
+type TagType = 'primary' | 'success' | 'warning' | 'info' | 'danger'
+
+const statusMap: Record<string, TagType> = {
   passed: 'success',
   failed: 'danger',
   blocked: 'warning'
 }
 
-const priorityMap: Record<string, string> = {
+const priorityMap: Record<string, TagType> = {
   high: 'danger',
   medium: 'warning',
   low: 'info'
 }
-
-const groupByModule = computed(() => {
-  const groups: Record<string, TestCase[]> = {}
-  testCases.value.forEach(tc => {
-    const module = tc.module || '未分类'
-    if (!groups[module]) {
-      groups[module] = []
-    }
-    groups[module].push(tc)
-  })
-  return groups
-})
 
 const totalProgress = computed(() => {
   if (testCases.value.length === 0) return 0

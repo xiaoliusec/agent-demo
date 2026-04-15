@@ -32,6 +32,7 @@ type EventEmitter func(event string, data interface{})
 
 func (e *Engine) Run(ctx context.Context, goal string, emit EventEmitter) error {
 	e.store.SetStatus(&core.TestStatus{State: "running", CurrentStep: 0})
+	emit("status_update", e.store.GetStatus())
 
 	state := core.StateView{
 		Goal:          goal,
@@ -47,7 +48,9 @@ func (e *Engine) Run(ctx context.Context, goal string, emit EventEmitter) error 
 	for state.StepCount < maxSteps {
 		status := e.store.GetStatus()
 		if status.State == "stopped" {
-			break
+			emit("status_update", status)
+			emit("test_stopped", "stopped by user")
+			return nil
 		}
 
 		decision, err := e.model.Decide(ctx, state)
@@ -57,6 +60,7 @@ func (e *Engine) Run(ctx context.Context, goal string, emit EventEmitter) error 
 				CurrentStep: state.StepCount,
 				LastError:   err.Error(),
 			})
+			emit("status_update", e.store.GetStatus())
 			return fmt.Errorf("model decide error: %w", err)
 		}
 
@@ -68,6 +72,7 @@ func (e *Engine) Run(ctx context.Context, goal string, emit EventEmitter) error 
 				CurrentStep: state.StepCount,
 				TotalCases:  len(state.TestCases),
 			})
+			emit("status_update", e.store.GetStatus())
 			emit("test_complete", decision.FinalResult)
 			return nil
 		}
@@ -82,6 +87,7 @@ func (e *Engine) Run(ctx context.Context, goal string, emit EventEmitter) error 
 				CurrentStep: state.StepCount,
 				LastError:   fmt.Sprintf("guard check failed: %v", err),
 			})
+			emit("status_update", e.store.GetStatus())
 			return fmt.Errorf("guard check failed: %w", err)
 		}
 
@@ -92,6 +98,7 @@ func (e *Engine) Run(ctx context.Context, goal string, emit EventEmitter) error 
 				CurrentStep: state.StepCount,
 				LastError:   err.Error(),
 			})
+			emit("status_update", e.store.GetStatus())
 			return fmt.Errorf("tool execution error: %w", err)
 		}
 
@@ -104,12 +111,16 @@ func (e *Engine) Run(ctx context.Context, goal string, emit EventEmitter) error 
 			"step":   state.StepCount,
 			"result": result,
 		})
+		if screenshot, ok := result.Artifacts["screenshot"]; ok && screenshot != "" {
+			emit("screenshot_update", screenshot)
+		}
 
 		if decision.TestCase != nil {
 			e.store.AddTestCase(decision.TestCase)
 			state.TestCases = append(state.TestCases, decision.TestCase)
 			emit("test_case_generated", decision.TestCase)
 		}
+		emit("status_update", e.store.GetStatus())
 
 		time.Sleep(100 * time.Millisecond)
 	}
@@ -118,6 +129,7 @@ func (e *Engine) Run(ctx context.Context, goal string, emit EventEmitter) error 
 		State:       "completed",
 		CurrentStep: state.StepCount,
 	})
+	emit("status_update", e.store.GetStatus())
 	return nil
 }
 

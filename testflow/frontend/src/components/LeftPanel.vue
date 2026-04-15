@@ -60,7 +60,13 @@ const providers = [
 
 const startTest = async () => {
   if (!goal.value) {
-    window.message.warning('请输入测试目标')
+    // @ts-ignore
+    if (window.message?.warning) {
+      // @ts-ignore
+      window.message.warning('请输入测试目标')
+    } else {
+      logs.value.push('[WARN] 请输入测试目标')
+    }
     return
   }
   
@@ -68,14 +74,16 @@ const startTest = async () => {
   isRunning.value = true
   
   try {
-    // 模拟开始测试
     // @ts-ignore
     if (window.go) {
+      // @ts-ignore
+      await window.go.testflow.App.SetConfig(config.value)
       // @ts-ignore
       await window.go.testflow.App.StartTest(goal.value)
     }
   } catch (e) {
     logs.value.push(`[ERROR] ${e}`)
+    isRunning.value = false
   }
 }
 
@@ -107,8 +115,22 @@ const loadConfig = async () => {
   }
 }
 
+const loadStatus = async () => {
+  try {
+    // @ts-ignore
+    if (window.go) {
+      // @ts-ignore
+      status.value = await window.go.testflow.App.GetTestStatus()
+      isRunning.value = status.value.state === 'running'
+    }
+  } catch (e) {
+    console.error('Failed to load status:', e)
+  }
+}
+
 onMounted(() => {
   loadConfig()
+  loadStatus()
   
   // @ts-ignore
   if (window.runtime) {
@@ -122,10 +144,28 @@ onMounted(() => {
     window.runtime.Events.On('step_complete', (data: any) => {
       logs.value.push(`[STEP ${data.step}] 完成`)
     })
+
+    // @ts-ignore
+    window.runtime.Events.On('status_update', (data: any) => {
+      status.value = data
+      isRunning.value = data?.state === 'running'
+    })
     
     // @ts-ignore
     window.runtime.Events.On('test_complete', (data: string) => {
       logs.value.push(`[完成] ${data}`)
+      isRunning.value = false
+    })
+
+    // @ts-ignore
+    window.runtime.Events.On('test_stopped', (data: string) => {
+      logs.value.push(`[停止] ${data}`)
+      isRunning.value = false
+    })
+
+    // @ts-ignore
+    window.runtime.Events.On('test_error', (data: string) => {
+      logs.value.push(`[ERROR] ${data}`)
       isRunning.value = false
     })
     
